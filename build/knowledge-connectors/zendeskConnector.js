@@ -44,13 +44,13 @@ exports.zendeskConnector = (0, extension_tools_1.createKnowledgeConnector)({
     ],
     function: async ({ config, api, sources: currentSources }) => {
         const { domain, email, apiToken, locale, sourceTags } = config;
-        const response = await axios_1.default.get(`${domain}/api/v2/help_center/articles/search.json?locale=${locale}`, {
+        const response = await axios_1.default.get(`${domain}/api/v2/help_center/${locale}/articles.json?per_page=100`, {
             auth: {
                 username: `${email}/token`,
                 password: apiToken,
             },
         });
-        const articles = response.data.results || [];
+        const articles = response.data.articles || [];
         const updatedSources = new Set();
         for (const article of articles) {
             const externalId = article.id.toString();

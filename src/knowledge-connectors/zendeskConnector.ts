@@ -43,7 +43,7 @@ export const zendeskConnector = createKnowledgeConnector({
         const { domain, email, apiToken, locale, sourceTags } = config;
 
         const response = await axios.get(
-            `${domain}/api/v2/help_center/articles/search.json?locale=${locale}`,
+            `${domain}/api/v2/help_center/${locale}/articles.json?per_page=100`,
             {
                 auth: {
                     username: `${email}/token`,
@@ -52,7 +52,7 @@ export const zendeskConnector = createKnowledgeConnector({
             }
         );
 
-        const articles = response.data.results || [];
+        const articles = response.data.articles || [];
         const updatedSources = new Set<string>();
 
         for (const article of articles) {
