@@ -43,6 +43,7 @@ exports.zendeskConnector = (0, extension_tools_1.createKnowledgeConnector)({
         },
     ],
     function: async ({ config, api, sources: currentSources }) => {
+        var _a;
         const { domain, email, apiToken, locale, sourceTags } = config;
         const response = await axios_1.default.get(`${domain}/api/v2/help_center/${locale}/articles.json?per_page=100`, {
             auth: {
@@ -54,21 +55,26 @@ exports.zendeskConnector = (0, extension_tools_1.createKnowledgeConnector)({
         const updatedSources = new Set();
         for (const article of articles) {
             const externalId = article.id.toString();
-            const content = article.body.replace(/<[^>]*>?/gm, "").trim();
+            const rawBody = article.body || "";
+            const content = rawBody.replace(/<[^>]*>?/gm, "").trim();
+            if (!content || content.length < 5) {
+                continue; // skip any empty or invalid articles
+            }
             const result = await api.upsertKnowledgeSource({
                 name: article.title,
                 description: `Zendesk FAQ: ${article.title}`,
                 tags: sourceTags,
                 chunkCount: 1,
                 externalIdentifier: externalId,
-                contentHashOrTimestamp: article.updated_at,
+                contentHashOrTimestamp: (_a = article.updated_at) !== null && _a !== void 0 ? _a : externalId,
             });
             updatedSources.add(externalId);
             if (!result)
                 continue;
+            const MAX_CHUNK_LENGTH = 3000;
             await api.createKnowledgeChunk({
                 knowledgeSourceId: result.knowledgeSourceId,
-                text: content,
+                text: content.substring(0, MAX_CHUNK_LENGTH),
             });
         }
         for (const source of currentSources) {

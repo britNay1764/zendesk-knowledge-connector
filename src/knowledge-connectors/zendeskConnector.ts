@@ -57,7 +57,12 @@ export const zendeskConnector = createKnowledgeConnector({
 
         for (const article of articles) {
             const externalId = article.id.toString();
-            const content = article.body.replace(/<[^>]*>?/gm, "").trim();
+            const rawBody = article.body || "";
+            const content = rawBody.replace(/<[^>]*>?/gm, "").trim();
+
+            if (!content || content.length < 5) {
+                continue; // skip any empty or invalid articles
+            }
 
             const result = await api.upsertKnowledgeSource({
                 name: article.title,
@@ -65,16 +70,18 @@ export const zendeskConnector = createKnowledgeConnector({
                 tags: sourceTags as string[],
                 chunkCount: 1,
                 externalIdentifier: externalId,
-                contentHashOrTimestamp: article.updated_at,
+                contentHashOrTimestamp: article.updated_at ?? externalId,
             });
 
             updatedSources.add(externalId);
 
             if (!result) continue;
 
+            const MAX_CHUNK_LENGTH = 3000;
+
             await api.createKnowledgeChunk({
                 knowledgeSourceId: result.knowledgeSourceId,
-                text: content,
+                text: content.substring(0, MAX_CHUNK_LENGTH),
             });
         }
 
