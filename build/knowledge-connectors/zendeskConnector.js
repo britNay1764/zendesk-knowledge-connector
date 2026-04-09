@@ -44,6 +44,7 @@ exports.zendeskConnector = (0, extension_tools_1.createKnowledgeConnector)({
     ],
     function: async ({ config, api, sources: currentSources }) => {
         var _a;
+        console.log("new build test - 12345");
         const { domain, email, apiToken, locale, sourceTags } = config;
         const response = await axios_1.default.get(`${domain}/api/v2/help_center/${locale}/articles.json?per_page=100`, {
             auth: {
@@ -60,26 +61,45 @@ exports.zendeskConnector = (0, extension_tools_1.createKnowledgeConnector)({
             if (!content || content.length < 5) {
                 continue; // skip any empty or invalid articles
             }
+            console.log("processing article:", article.title);
+            const sanitizedName = article.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "");
+            const uniqueName = `${sanitizedName}-${externalId}`;
+            console.log("sanitized name:", uniqueName);
             const result = await api.upsertKnowledgeSource({
-                name: article.title,
+                name: uniqueName,
                 description: `Zendesk FAQ: ${article.title}`,
                 tags: sourceTags,
-                chunkCount: 1,
+                chunkCount: Math.ceil(content.length / 1000),
                 externalIdentifier: externalId,
                 contentHashOrTimestamp: (_a = article.updated_at) !== null && _a !== void 0 ? _a : externalId,
             });
-            updatedSources.add(externalId);
-            if (!result)
+            // updatedSources.add(externalId);
+            if (!result) {
+                updatedSources.add(externalId);
                 continue;
-            const MAX_CHUNK_LENGTH = 3000;
-            await api.createKnowledgeChunk({
-                knowledgeSourceId: result.knowledgeSourceId,
-                text: content.substring(0, MAX_CHUNK_LENGTH),
-            });
+            }
+            const MAX_CHUNK_LENGTH = 1000;
+            try {
+                for (let i = 0; i < content.length; i += MAX_CHUNK_LENGTH) {
+                    const chunk = content.substring(i, i + MAX_CHUNK_LENGTH);
+                    await api.createKnowledgeChunk({
+                        knowledgeSourceId: result.knowledgeSourceId,
+                        text: chunk,
+                    });
+                }
+                updatedSources.add(externalId);
+            }
+            catch (chunkError) {
+                console.log("Chunk failed for article", article.title, "Error:", chunkError);
+                continue;
+            }
         }
         for (const source of currentSources) {
-            if (updatedSources.has(source.externalIdentifier) ||
-                !source.externalIdentifier) {
+            const extId = source.externalIdentifier;
+            if (!extId || updatedSources.has(extId)) {
                 continue;
             }
             await api.deleteKnowledgeSource({
