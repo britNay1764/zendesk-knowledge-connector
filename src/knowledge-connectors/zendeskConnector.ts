@@ -96,7 +96,7 @@ export const zendeskConnector = createKnowledgeConnector({
             for (const paragraph of paragraphs) {
                 await api.createKnowledgeChunk({
                     knowledgeSourceId: result.knowledgeSourceId,
-                    text: paragraph,
+                    text: `${article.title}\n\n${paragraph}`,
                 });
             }
 
