@@ -40,92 +40,85 @@ export const zendeskConnector = createKnowledgeConnector({
     ] as const,
 
     function: async ({ config, api, sources: currentSources }) => {
-        console.log("new build test - 12345")
-        const { domain, email, apiToken, locale, sourceTags } = config;
 
-        const response = await axios.get(
-            `${domain}/api/v2/help_center/${locale}/articles.json?per_page=100`,
-            {
-                auth: {
-                    username: `${email}/token`,
-                    password: apiToken,
-                },
-            }
-        );
+    const { domain, email, apiToken, locale, sourceTags } = config;
 
-        const articles = response.data.articles || [];
-        const updatedSources = new Set<string>();
+    const response = await axios.get(
+        `${domain}/api/v2/help_center/${locale}/articles.json?per_page=100`,
+        {
+            auth: {
+                username: `${email}/token`,
+                password: apiToken,
+            },
+        }
+    );
 
-        for (const article of articles) {
-            const externalId = article.id.toString();
-            const rawBody = article.body || "";
-            const content = rawBody.replace(/<[^>]*>?/gm, "").trim();
+    const articles = response.data.articles || [];
+    const updatedSources = new Set<string>();
 
-            if (!content || content.length < 5) {
-                continue; // skip any empty or invalid articles
-            }
+    for (const article of articles) {
 
-            console.log("processing article:", article.title);
+        const externalId = article.id.toString();
+        const rawBody = article.body || "";
+        const content = rawBody.replace(/<[^>]*>?/gm, "").trim();
 
-            const sanitizedName = article.title
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/^-+|-+$/g, "");
-            
-            const uniqueName = `${sanitizedName}-${externalId}`;
+        if (!content || content.length < 5) {
+            continue;
+        }
 
-            console.log("sanitized name:", uniqueName);
+        const sanitizedName = article.title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
 
-            const result = await api.upsertKnowledgeSource({
-                name: uniqueName,
-                description: `Zendesk FAQ: ${article.title}`,
-                tags: sourceTags as string[],
-                chunkCount: Math.ceil(content.length / 1000),
-                externalIdentifier: externalId,
-                contentHashOrTimestamp: article.updated_at ?? externalId,
+        const uniqueName = `${sanitizedName}-${externalId}`;
 
-            });
+        const paragraphs = content
+    .split(/\n+/)
+    .map((p: string) => p.trim())
+    .filter((p: string) => p.length > 50);
 
-
-            // updatedSources.add(externalId);
-
-            if (!result) {
-                updatedSources.add(externalId);
-                continue;
-            }
-
-           const MAX_CHUNK_LENGTH = 1000;
-
-try {
-    for (let i = 0; i < content.length; i += MAX_CHUNK_LENGTH) {
-        const chunk = content.substring(i, i + MAX_CHUNK_LENGTH);
-
-        await api.createKnowledgeChunk({
-            knowledgeSourceId: result.knowledgeSourceId,
-            text: chunk,
+        const result = await api.upsertKnowledgeSource({
+            name: uniqueName,
+            description: `Zendesk FAQ: ${article.title}`,
+            tags: sourceTags as string[],
+            chunkCount: paragraphs.length,
+            externalIdentifier: externalId,
+            contentHashOrTimestamp: article.updated_at ?? externalId,
         });
+
+        if (!result) {
+            updatedSources.add(externalId);
+            continue;
+        }
+
+        try {
+            for (const paragraph of paragraphs) {
+                await api.createKnowledgeChunk({
+                    knowledgeSourceId: result.knowledgeSourceId,
+                    text: paragraph,
+                });
+            }
+
+            updatedSources.add(externalId);
+
+        } catch (chunkError) {
+            console.log("Chunk failed for article:", article.title, chunkError);
+            continue;
+        }
     }
 
-    updatedSources.add(externalId);
+    for (const source of currentSources) {
 
-            } catch (chunkError) {
-                console.log("Chunk failed for article", article.title, "Error:", chunkError);
-                continue;
-            }
+        const extId = source.externalIdentifier as string | undefined;
 
+        if (!extId || updatedSources.has(extId)) {
+            continue;
         }
 
-                for (const source of currentSources) {
-            const extId = source.externalIdentifier as string | undefined;
-
-            if (!extId || updatedSources.has(extId)) {
-                continue;
-            }
-
-            await api.deleteKnowledgeSource({
-                knowledgeSourceId: source.knowledgeSourceId,
-            });
-        }
-
+        await api.deleteKnowledgeSource({
+            knowledgeSourceId: source.knowledgeSourceId,
+    });
+    }
     },
 });
