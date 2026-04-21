@@ -53,7 +53,17 @@ export const zendeskConnector = createKnowledgeConnector({
         }
     );
 
-    const articles = response.data.articles || [];
+    const rawArticles = response.data.articles || [];
+
+const articlesMap = new Map<string, any>();
+
+for (const article of rawArticles) {
+    articlesMap.set(article.id.toString(), article);
+}
+
+const articles = Array.from(articlesMap.values());
+        
+        
     const updatedSources = new Set<string>();
 
     for (const article of articles) {

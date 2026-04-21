@@ -51,7 +51,12 @@ exports.zendeskConnector = (0, extension_tools_1.createKnowledgeConnector)({
                 password: apiToken,
             },
         });
-        const articles = response.data.articles || [];
+        const rawArticles = response.data.articles || [];
+        const articlesMap = new Map();
+        for (const article of rawArticles) {
+            articlesMap.set(article.id.toString(), article);
+        }
+        const articles = Array.from(articlesMap.values());
         const updatedSources = new Set();
         for (const article of articles) {
             const externalId = article.id.toString();
