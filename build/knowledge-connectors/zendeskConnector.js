@@ -52,6 +52,7 @@ exports.zendeskConnector = (0, extension_tools_1.createKnowledgeConnector)({
             },
         });
         const rawArticles = response.data.articles || [];
+        // Deduplicate by article ID
         const articlesMap = new Map();
         for (const article of rawArticles) {
             articlesMap.set(article.id.toString(), article);
@@ -65,41 +66,43 @@ exports.zendeskConnector = (0, extension_tools_1.createKnowledgeConnector)({
             if (!content || content.length < 5) {
                 continue;
             }
+            // Sanitize resource name
             const sanitizedName = article.title
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, "-")
-                .replace(/^-+|-+$/g, "");
+                .replace(/^-+|-+$/g, "")
+                .substring(0, 40);
             const uniqueName = `${sanitizedName}-${externalId}`;
-            const paragraphs = content
-                .split(/\n+/)
-                .map((p) => p.trim())
-                .filter((p) => p.length > 50);
-            const result = await api.upsertKnowledgeSource({
-                name: uniqueName,
-                description: `Zendesk FAQ: ${article.title}`,
-                tags: sourceTags,
-                chunkCount: paragraphs.length,
-                externalIdentifier: externalId,
-                contentHashOrTimestamp: (_a = article.updated_at) !== null && _a !== void 0 ? _a : externalId,
-            });
-            if (!result) {
-                updatedSources.add(externalId);
-                continue;
-            }
             try {
-                for (const paragraph of paragraphs) {
+                const fullText = `${article.title}\n\n${content}`;
+                const MAX_CHUNK_LENGTH = 2000;
+                const totalChunks = Math.ceil(fullText.length / MAX_CHUNK_LENGTH);
+                const result = await api.upsertKnowledgeSource({
+                    name: uniqueName,
+                    description: `Zendesk FAQ: ${article.title}`,
+                    tags: sourceTags,
+                    chunkCount: totalChunks,
+                    externalIdentifier: externalId,
+                    contentHashOrTimestamp: (_a = article.updated_at) !== null && _a !== void 0 ? _a : externalId,
+                });
+                if (!result) {
+                    updatedSources.add(externalId);
+                    continue;
+                }
+                for (let i = 0; i < fullText.length; i += MAX_CHUNK_LENGTH) {
+                    const chunk = fullText.substring(i, i + MAX_CHUNK_LENGTH);
                     await api.createKnowledgeChunk({
                         knowledgeSourceId: result.knowledgeSourceId,
-                        text: `${article.title}\n\n${paragraph}`,
+                        text: chunk,
                     });
                 }
                 updatedSources.add(externalId);
             }
-            catch (chunkError) {
-                console.log("Chunk failed for article:", article.title, chunkError);
-                continue;
+            catch (error) {
+                throw new Error(`FAILED → ${article.title} | ${(error === null || error === void 0 ? void 0 : error.message) || error}`);
             }
         }
+        // Cleanup old sources
         for (const source of currentSources) {
             const extId = source.externalIdentifier;
             if (!extId || updatedSources.has(extId)) {
