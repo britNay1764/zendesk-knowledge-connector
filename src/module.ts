@@ -7,6 +7,6 @@ export default createExtension({
     knowledge: [zendeskConnector],
 
     options: {
-        label: "Zendesk Knowledge Connector",
+        label: "Zendesk FL Knowledge Connector",
     },
 });

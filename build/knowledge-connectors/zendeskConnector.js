@@ -45,17 +45,20 @@ exports.zendeskConnector = (0, extension_tools_1.createKnowledgeConnector)({
     function: async ({ config, api, sources: currentSources }) => {
         var _a;
         const { domain, email, apiToken, locale, sourceTags } = config;
-        const response = await axios_1.default.get(`${domain}/api/v2/help_center/${locale}/articles.json?per_page=100`, {
+        const response = await axios_1.default.get(`${domain}/api/v2/help_center/articles/search.json?locale=${locale}&query=*`, {
             auth: {
                 username: `${email}/token`,
                 password: apiToken,
             },
         });
-        const rawArticles = response.data.articles || [];
-        // Deduplicate by article ID
+        const rawArticles = response.data.results || [];
+        // Dups by article ID
         const articlesMap = new Map();
         for (const article of rawArticles) {
-            articlesMap.set(article.id.toString(), article);
+            const id = article.id.toString();
+            if (!articlesMap.has(id)) {
+                articlesMap.set(id, article);
+            }
         }
         const articles = Array.from(articlesMap.values());
         const updatedSources = new Set();

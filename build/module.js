@@ -6,7 +6,7 @@ exports.default = (0, extension_tools_1.createExtension)({
     nodes: [], // REQUIRED by SDK even if unused
     knowledge: [zendeskConnector_1.zendeskConnector],
     options: {
-        label: "Zendesk Knowledge Connector",
+        label: "Zendesk FL Knowledge Connector",
     },
 });
 //# sourceMappingURL=module.js.map

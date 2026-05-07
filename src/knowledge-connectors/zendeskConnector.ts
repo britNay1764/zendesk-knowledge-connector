@@ -44,7 +44,7 @@ export const zendeskConnector = createKnowledgeConnector({
         const { domain, email, apiToken, locale, sourceTags } = config;
 
         const response = await axios.get(
-            `${domain}/api/v2/help_center/${locale}/articles.json?per_page=100`,
+            `${domain}/api/v2/help_center/articles/search.json?locale=${locale}&query=*`,
             {
                 auth: {
                     username: `${email}/token`,
@@ -53,12 +53,17 @@ export const zendeskConnector = createKnowledgeConnector({
             }
         );
 
-        const rawArticles = response.data.articles || [];
+        const rawArticles = response.data.results || []
 
-        // Deduplicate by article ID
+        // Dups by article ID
         const articlesMap = new Map<string, any>();
+
         for (const article of rawArticles) {
-            articlesMap.set(article.id.toString(), article);
+            const id = article.id.toString();
+
+            if (!articlesMap.has(id)) {
+                articlesMap.set(id, article);
+            }
         }
 
         const articles = Array.from(articlesMap.values());

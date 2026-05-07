@@ -1,11 +1,11 @@
 {
-    "name": "confluence",
+    "name": "zendesk-knowledge-connector-fl",
     "version": "6.0.0",
-    "description": "Integrates with the Atlassian's Confluence (Only compatible with Cognigy version v.2026.5.0 and above).",
+    "description": "Zendesk Knowledge Connector for Fabletics (FL) Help Center.",
     "main": "build/module.js",
     "scripts": {
         "transpile": "tsc -p tsconfig.production.json",
-        "zip": "tar cfz confluence.tar.gz build/* package.json package-lock.json README.md icon.png",
+        "zip": "tar cfz zendesk-knowledge-connector-fl.tar.gz build/* package.json package-lock.json README.md icon.png",
         "build": "npm run test && npm run transpile && npm run lint && npm run zip",
         "format": "biome check --write",
         "lint": "biome check",
@@ -13,8 +13,8 @@
     },
     "keywords": [
         "Knowledge",
-        "Wiki",
-        "confluence-kai",
+        "Zendesk",
+        "Fabletics",
         "extensions"
     ],
     "engines": {
